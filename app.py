@@ -303,12 +303,35 @@ def upload_bulk_videos():
         if ext not in ALLOWED_EXTS["video"]:
             continue
 
-        clean_stem = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', Path(orig_filename).stem)
-        dest = VIDEOS_UPLOADS / f"{clean_stem}{ext}"
-        counter = 1
-        while dest.exists():
-            dest = VIDEOS_UPLOADS / f"{clean_stem}_{counter}{ext}"
-            counter += 1
+        # Automatic deduplication: check if already exists by original_name
+        existing_target = None
+        for old_f in VIDEOS_UPLOADS.glob("*"):
+            if old_f.name.endswith(".meta.json"):
+                continue
+            meta_path = VIDEOS_UPLOADS / f"{old_f.name}.meta.json"
+            if meta_path.exists():
+                try:
+                    with open(meta_path) as mf:
+                        if json.load(mf).get("original_name") == orig_filename:
+                            existing_target = old_f
+                            break
+                except Exception:
+                    pass
+            elif old_f.name == orig_filename:
+                existing_target = old_f
+                break
+
+        if existing_target:
+            dest = existing_target
+            is_dup = True
+        else:
+            is_dup = False
+            clean_stem = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', Path(orig_filename).stem)
+            dest = VIDEOS_UPLOADS / f"{clean_stem}{ext}"
+            counter = 1
+            while dest.exists():
+                dest = VIDEOS_UPLOADS / f"{clean_stem}_{counter}{ext}"
+                counter += 1
 
         f.save(dest)
         meta_f = VIDEOS_UPLOADS / f"{dest.name}.meta.json"
@@ -319,9 +342,13 @@ def upload_bulk_videos():
         uploaded.append({
             "filename": dest.name,
             "original_name": orig_filename,
-            "size_mb": sz_mb
+            "size_mb": sz_mb,
+            "is_duplicate": is_dup
         })
-        log(f"Queued Short Video: '{orig_filename}' ({sz_mb} MB)")
+        if is_dup:
+            log(f"⚡ Deduplicated Short Video: '{orig_filename}' updated (counted only once!)")
+        else:
+            log(f"Queued Short Video: '{orig_filename}' ({sz_mb} MB)")
 
     return jsonify({"success": True, "uploaded": uploaded, "all_videos": get_uploaded_videos()})
 
@@ -362,12 +389,35 @@ def upload_bulk_outros():
         if ext not in ALLOWED_EXTS["outro"]:
             continue
 
-        clean_stem = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', Path(orig_filename).stem)
-        dest = OUTROS_UPLOADS / f"{clean_stem}{ext}"
-        counter = 1
-        while dest.exists():
-            dest = OUTROS_UPLOADS / f"{clean_stem}_{counter}{ext}"
-            counter += 1
+        # Automatic deduplication: check if already exists by original_name
+        existing_target = None
+        for old_f in OUTROS_UPLOADS.glob("*"):
+            if old_f.name.endswith(".meta.json"):
+                continue
+            meta_path = OUTROS_UPLOADS / f"{old_f.name}.meta.json"
+            if meta_path.exists():
+                try:
+                    with open(meta_path) as mf:
+                        if json.load(mf).get("original_name") == orig_filename:
+                            existing_target = old_f
+                            break
+                except Exception:
+                    pass
+            elif old_f.name == orig_filename:
+                existing_target = old_f
+                break
+
+        if existing_target:
+            dest = existing_target
+            is_dup = True
+        else:
+            is_dup = False
+            clean_stem = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', Path(orig_filename).stem)
+            dest = OUTROS_UPLOADS / f"{clean_stem}{ext}"
+            counter = 1
+            while dest.exists():
+                dest = OUTROS_UPLOADS / f"{clean_stem}_{counter}{ext}"
+                counter += 1
 
         f.save(dest)
         meta_f = OUTROS_UPLOADS / f"{dest.name}.meta.json"
@@ -378,11 +428,16 @@ def upload_bulk_outros():
         uploaded.append({
             "filename": dest.name,
             "original_name": orig_filename,
-            "size_mb": sz_mb
+            "size_mb": sz_mb,
+            "is_duplicate": is_dup
         })
-        log(f"Queued Podcast Outro: '{orig_filename}' ({sz_mb} MB)")
+        if is_dup:
+            log(f"⚡ Deduplicated Outro Clip: '{orig_filename}' updated (counted only once!)")
+        else:
+            log(f"Queued Podcast Outro: '{orig_filename}' ({sz_mb} MB)")
 
     return jsonify({"success": True, "uploaded": uploaded, "all_outros": get_uploaded_outros()})
+
 
 @app.route("/api/delete_outro", methods=["POST"])
 def delete_outro():

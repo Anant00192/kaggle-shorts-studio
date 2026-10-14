@@ -622,13 +622,23 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Deduplicate selection by file name
+        const uniqueFiles = [];
+        const seenNames = new Set();
+        videoFiles.forEach(f => {
+            if (!seenNames.has(f.name)) {
+                seenNames.add(f.name);
+                uniqueFiles.push(f);
+            }
+        });
+
         if (videosUploadProgress) {
             videosUploadProgress.classList.remove('hidden');
-            videosUploadStatusText.textContent = `Uploading ${videoFiles.length} short video(s)...`;
+            videosUploadStatusText.textContent = `Uploading ${uniqueFiles.length} short video(s)...`;
         }
 
         const formData = new FormData();
-        videoFiles.forEach(f => formData.append('files', f));
+        uniqueFiles.forEach(f => formData.append('files', f));
 
         try {
             const res = await apiFetch('/api/upload_bulk_videos', {
@@ -782,13 +792,23 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Deduplicate selection by file name
+        const uniqueFiles = [];
+        const seenNames = new Set();
+        videoFiles.forEach(f => {
+            if (!seenNames.has(f.name)) {
+                seenNames.add(f.name);
+                uniqueFiles.push(f);
+            }
+        });
+
         if (outrosUploadProgress) {
             outrosUploadProgress.classList.remove('hidden');
-            outrosUploadStatusText.textContent = `Uploading ${videoFiles.length} outro clip(s)...`;
+            outrosUploadStatusText.textContent = `Uploading ${uniqueFiles.length} outro clip(s)...`;
         }
 
         const formData = new FormData();
-        videoFiles.forEach(f => formData.append('files', f));
+        uniqueFiles.forEach(f => formData.append('files', f));
 
         try {
             const res = await apiFetch('/api/upload_bulk_outros', {
