@@ -936,3 +936,204 @@ input[type="range"] {
 .preview-indicator strong {
     color: var(--text-primary);
 }
+
+/* ============================================================
+   Bulk Multi-File Video Dropzone & Queue List Styles
+   ============================================================ */
+
+.flex-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.queue-actions-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.badge-count {
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    color: var(--accent-blue);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 999px;
+}
+
+.hidden-file-input {
+    display: none !important;
+}
+
+.bulk-dropzone {
+    border: 2px dashed rgba(59, 130, 246, 0.35);
+    background: rgba(15, 23, 42, 0.4);
+    border-radius: var(--radius-md);
+    padding: 32px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    margin-bottom: 16px;
+}
+
+.bulk-dropzone:hover,
+.bulk-dropzone.drag-over {
+    border-color: var(--accent-blue);
+    background: rgba(59, 130, 246, 0.08);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+}
+
+.bulk-dropzone-sm {
+    padding: 22px 16px;
+    border-color: rgba(168, 85, 247, 0.35);
+}
+
+.bulk-dropzone-sm:hover,
+.bulk-dropzone-sm.drag-over {
+    border-color: var(--accent-purple);
+    background: rgba(168, 85, 247, 0.08);
+    box-shadow: 0 4px 20px rgba(168, 85, 247, 0.15);
+}
+
+.bulk-icon {
+    font-size: 38px;
+    margin-bottom: 8px;
+}
+
+.bulk-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.bulk-subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 14px;
+}
+
+.upload-progress-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    color: var(--accent-blue);
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 16px;
+}
+
+.queued-videos-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 420px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.queued-videos-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.queued-videos-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+}
+
+.video-queue-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    transition: all 0.2s;
+}
+
+.video-queue-item:hover {
+    border-color: rgba(59, 130, 246, 0.4);
+    background: rgba(30, 41, 59, 0.8);
+}
+
+.video-queue-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    overflow: hidden;
+}
+
+.video-queue-idx {
+    background: var(--accent-blue);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    flex-shrink: 0;
+}
+
+.outro-queue-idx {
+    background: var(--accent-purple);
+}
+
+.video-queue-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    overflow: hidden;
+}
+
+.video-queue-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 480px;
+}
+
+.video-queue-size {
+    font-size: 12px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.video-queue-del {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.15s;
+}
+
+.video-queue-del:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.empty-queue-msg {
+    text-align: center;
+    padding: 24px 16px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-style: italic;
+    background: rgba(15, 23, 42, 0.2);
+    border-radius: var(--radius-sm);
+    border: 1px dashed rgba(255, 255, 255, 0.08);
+}
+

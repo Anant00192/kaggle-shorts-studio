@@ -17,13 +17,16 @@ app.secret_key = 'kaggle-shorts-studio-secret-key'
 BASE_DIR = Path(__file__).resolve().parent
 UPLOADS_DIR = BASE_DIR / "uploads"
 GLOBAL_UPLOADS = UPLOADS_DIR / "global"
+VIDEOS_UPLOADS = UPLOADS_DIR / "videos"
+OUTROS_UPLOADS = UPLOADS_DIR / "outros"
 SLOTS_UPLOADS = UPLOADS_DIR / "slots"
 STAGING_DIR = BASE_DIR / "staging"
 OUTPUT_DIR = BASE_DIR / "output"
 NOTEBOOK_DIR = BASE_DIR / "notebook"
 
-for p in [GLOBAL_UPLOADS, SLOTS_UPLOADS, STAGING_DIR / "dataset", STAGING_DIR / "kernel", OUTPUT_DIR]:
+for p in [GLOBAL_UPLOADS, VIDEOS_UPLOADS, OUTROS_UPLOADS, SLOTS_UPLOADS, STAGING_DIR / "dataset", STAGING_DIR / "kernel", OUTPUT_DIR]:
     p.mkdir(parents=True, exist_ok=True)
+
 
 app_state = {
     "status": "idle",       # idle, syncing, pushing, running, complete, error
@@ -215,11 +218,51 @@ ALLOWED_EXTS = {
     "outro": {".mp4", ".mov", ".mkv", ".webm"},
 }
 
+def get_uploaded_videos():
+    vids = []
+    for f in sorted(VIDEOS_UPLOADS.glob("*"), key=lambda x: x.stat().st_mtime):
+        if f.name.endswith(".meta.json"):
+            continue
+        meta_f = VIDEOS_UPLOADS / f"{f.name}.meta.json"
+        orig_name = f.name
+        if meta_f.exists():
+            try:
+                with open(meta_f) as mf:
+                    orig_name = json.load(mf).get("original_name", f.name)
+            except Exception:
+                pass
+        vids.append({
+            "filename": f.name,
+            "original_name": orig_name,
+            "size_mb": round(f.stat().st_size / (1024 * 1024), 2)
+        })
+    return vids
+
+def get_uploaded_outros():
+    outs = []
+    for f in sorted(OUTROS_UPLOADS.glob("*"), key=lambda x: x.stat().st_mtime):
+        if f.name.endswith(".meta.json"):
+            continue
+        meta_f = OUTROS_UPLOADS / f"{f.name}.meta.json"
+        orig_name = f.name
+        if meta_f.exists():
+            try:
+                with open(meta_f) as mf:
+                    orig_name = json.load(mf).get("original_name", f.name)
+            except Exception:
+                pass
+        outs.append({
+            "filename": f.name,
+            "original_name": orig_name,
+            "size_mb": round(f.stat().st_size / (1024 * 1024), 2)
+        })
+    return outs
+
 @app.route("/api/studio_state", methods=["GET"])
 def studio_state():
-    # 1. Global assets
-    globals_data = {"voice": None, "bgm": None, "outro": None}
-    for asset_type in ["voice", "bgm", "outro"]:
+    # 1. Global assets (voice, bgm)
+    globals_data = {"voice": None, "bgm": None}
+    for asset_type in ["voice", "bgm"]:
         matches = list(GLOBAL_UPLOADS.glob(f"{asset_type}.*"))
         if matches:
             f = matches[0]
@@ -237,33 +280,131 @@ def studio_state():
                 "size_mb": round(f.stat().st_size / (1024 * 1024), 2)
             }
 
-    # 2. Slot video assets (1 to 10)
-    slots_data = {}
-    for slot_num in range(1, 11):
-        slot_str = str(slot_num)
-        slots_data[slot_str] = {"video": None}
-        v_matches = [m for m in SLOTS_UPLOADS.glob(f"slot_{slot_num}_video.*") if not m.name.endswith(".meta.json")]
-        if v_matches:
-            vf = v_matches[0]
-            orig_name = vf.name
-            meta_f = SLOTS_UPLOADS / f"slot_{slot_num}_video.meta.json"
-            if meta_f.exists():
-                try:
-                    with open(meta_f) as mf:
-                        orig_name = json.load(mf).get("original_name", vf.name)
-                except Exception:
-                    pass
-            slots_data[slot_str]["video"] = {
-                "filename": vf.name,
-                "original_name": orig_name,
-                "size_mb": round(vf.stat().st_size / (1024 * 1024), 2)
-            }
-
+    # 2. Uploaded Videos & Outros
     return jsonify({
+        "videos": get_uploaded_videos(),
+        "outros": get_uploaded_outros(),
         "globals": globals_data,
-        "slots": slots_data,
         "app_state": app_state
     })
+
+@app.route("/api/upload_bulk_videos", methods=["POST"])
+def upload_bulk_videos():
+    files = request.files.getlist("files") or request.files.getlist("file")
+    if not files:
+        return jsonify({"success": False, "error": "No video files received"}), 400
+
+    uploaded = []
+    for f in files:
+        if not f or not f.filename:
+            continue
+        orig_filename = f.filename
+        ext = Path(orig_filename).suffix.lower()
+        if ext not in ALLOWED_EXTS["video"]:
+            continue
+
+        clean_stem = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', Path(orig_filename).stem)
+        dest = VIDEOS_UPLOADS / f"{clean_stem}{ext}"
+        counter = 1
+        while dest.exists():
+            dest = VIDEOS_UPLOADS / f"{clean_stem}_{counter}{ext}"
+            counter += 1
+
+        f.save(dest)
+        meta_f = VIDEOS_UPLOADS / f"{dest.name}.meta.json"
+        with open(meta_f, "w") as mf:
+            json.dump({"original_name": orig_filename}, mf)
+
+        sz_mb = round(dest.stat().st_size / (1024 * 1024), 2)
+        uploaded.append({
+            "filename": dest.name,
+            "original_name": orig_filename,
+            "size_mb": sz_mb
+        })
+        log(f"Queued Short Video: '{orig_filename}' ({sz_mb} MB)")
+
+    return jsonify({"success": True, "uploaded": uploaded, "all_videos": get_uploaded_videos()})
+
+@app.route("/api/delete_video", methods=["POST"])
+def delete_video():
+    data = request.get_json() or {}
+    filename = data.get("filename", "").strip()
+    if filename:
+        target = VIDEOS_UPLOADS / secure_filename(filename)
+        if target.exists():
+            target.unlink()
+        meta = VIDEOS_UPLOADS / f"{target.name}.meta.json"
+        if meta.exists():
+            meta.unlink()
+        log(f"Deleted Short Video: '{filename}'")
+        return jsonify({"success": True, "all_videos": get_uploaded_videos()})
+    return jsonify({"success": False, "error": "Missing filename"}), 400
+
+@app.route("/api/clear_videos", methods=["POST"])
+def clear_videos():
+    for f in VIDEOS_UPLOADS.glob("*"):
+        f.unlink()
+    log("Cleared all queued short videos.")
+    return jsonify({"success": True, "all_videos": []})
+
+@app.route("/api/upload_bulk_outros", methods=["POST"])
+def upload_bulk_outros():
+    files = request.files.getlist("files") or request.files.getlist("file")
+    if not files:
+        return jsonify({"success": False, "error": "No outro files received"}), 400
+
+    uploaded = []
+    for f in files:
+        if not f or not f.filename:
+            continue
+        orig_filename = f.filename
+        ext = Path(orig_filename).suffix.lower()
+        if ext not in ALLOWED_EXTS["outro"]:
+            continue
+
+        clean_stem = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', Path(orig_filename).stem)
+        dest = OUTROS_UPLOADS / f"{clean_stem}{ext}"
+        counter = 1
+        while dest.exists():
+            dest = OUTROS_UPLOADS / f"{clean_stem}_{counter}{ext}"
+            counter += 1
+
+        f.save(dest)
+        meta_f = OUTROS_UPLOADS / f"{dest.name}.meta.json"
+        with open(meta_f, "w") as mf:
+            json.dump({"original_name": orig_filename}, mf)
+
+        sz_mb = round(dest.stat().st_size / (1024 * 1024), 2)
+        uploaded.append({
+            "filename": dest.name,
+            "original_name": orig_filename,
+            "size_mb": sz_mb
+        })
+        log(f"Queued Podcast Outro: '{orig_filename}' ({sz_mb} MB)")
+
+    return jsonify({"success": True, "uploaded": uploaded, "all_outros": get_uploaded_outros()})
+
+@app.route("/api/delete_outro", methods=["POST"])
+def delete_outro():
+    data = request.get_json() or {}
+    filename = data.get("filename", "").strip()
+    if filename:
+        target = OUTROS_UPLOADS / secure_filename(filename)
+        if target.exists():
+            target.unlink()
+        meta = OUTROS_UPLOADS / f"{target.name}.meta.json"
+        if meta.exists():
+            meta.unlink()
+        log(f"Deleted Outro Clip: '{filename}'")
+        return jsonify({"success": True, "all_outros": get_uploaded_outros()})
+    return jsonify({"success": False, "error": "Missing filename"}), 400
+
+@app.route("/api/clear_outros", methods=["POST"])
+def clear_outros():
+    for f in OUTROS_UPLOADS.glob("*"):
+        f.unlink()
+    log("Cleared all queued outro clips.")
+    return jsonify({"success": True, "all_outros": []})
 
 @app.route("/api/upload_global", methods=["POST"])
 def upload_global():
@@ -307,48 +448,13 @@ def delete_global():
         return jsonify({"success": True})
     return jsonify({"success": False, "error": "Invalid kind"}), 400
 
-@app.route("/api/upload_slot_file", methods=["POST"])
-def upload_slot_file():
-    if "file" not in request.files or "slot_num" not in request.form:
-        return jsonify({"success": False, "error": "Missing file or slot_num"}), 400
-
-    file = request.files["file"]
-    slot_num = request.form["slot_num"].strip()
-
-    orig_filename = file.filename or f"slot_{slot_num}.mp4"
-    ext = Path(orig_filename).suffix.lower()
-
-    if ext not in ALLOWED_EXTS["video"]:
-        return jsonify({"success": False, "error": f"File extension '{ext}' not allowed for video"}), 400
-
-    # Remove existing
-    for old_f in SLOTS_UPLOADS.glob(f"slot_{slot_num}_video.*"):
-        old_f.unlink()
-
-    dest = SLOTS_UPLOADS / f"slot_{slot_num}_video{ext}"
-    file.save(dest)
-
-    meta_file = SLOTS_UPLOADS / f"slot_{slot_num}_video.meta.json"
-    with open(meta_file, "w") as mf:
-        json.dump({"original_name": orig_filename}, mf)
-
-    log(f"Uploaded Slot [{slot_num}] Video: {orig_filename} ({dest.stat().st_size / (1024*1024):.2f} MB)")
-    return jsonify({"success": True, "original_name": orig_filename, "size_mb": round(dest.stat().st_size / (1024*1024), 2)})
-
-@app.route("/api/delete_slot_file", methods=["POST"])
-def delete_slot_file():
-    data = request.get_json() or {}
-    slot_num = data.get("slot_num")
-    if slot_num:
-        for f in SLOTS_UPLOADS.glob(f"slot_{slot_num}_video.*"):
-            f.unlink()
-        log(f"Deleted Slot [{slot_num}] Video")
-        return jsonify({"success": True})
-    return jsonify({"success": False, "error": "Invalid slot_num"}), 400
-
 @app.route("/api/clear_all", methods=["POST"])
 def clear_all():
     for f in GLOBAL_UPLOADS.glob("*"):
+        f.unlink()
+    for f in VIDEOS_UPLOADS.glob("*"):
+        f.unlink()
+    for f in OUTROS_UPLOADS.glob("*"):
         f.unlink()
     for f in SLOTS_UPLOADS.glob("*"):
         f.unlink()
@@ -385,23 +491,24 @@ def run_sync_and_launch(config):
         for sub in ["videos", "voices", "bgms", "outros"]:
             (ds_dir / sub).mkdir(parents=True, exist_ok=True)
 
-        # 1. Collect valid slots
-        valid_slots = []
-        for slot_num in range(1, 11):
-            vid_matches = [m for m in SLOTS_UPLOADS.glob(f"slot_{slot_num}_video.*") if not m.name.endswith(".meta.json")]
-            if vid_matches:
-                valid_slots.append((slot_num, vid_matches[0]))
+        # 1. Collect all valid short videos
+        valid_videos = [f for f in sorted(VIDEOS_UPLOADS.glob("*"), key=lambda x: x.stat().st_mtime) if not f.name.endswith(".meta.json")]
+        if not valid_videos:
+            for slot_num in range(1, 11):
+                m = [x for x in SLOTS_UPLOADS.glob(f"slot_{slot_num}_video.*") if not x.name.endswith(".meta.json")]
+                if m:
+                    valid_videos.append(m[0])
 
-        if not valid_slots:
-            raise RuntimeError("No short videos found! Please upload at least one video.")
+        if not valid_videos:
+            raise RuntimeError("No short videos found! Please drag & drop at least one short video.")
 
-        log(f"Found {len(valid_slots)} short video(s) to process.")
+        log(f"Found {len(valid_videos)} short video(s) to process in batch queue.")
 
-        # Copy videos
-        for slot_idx, (slot_num, vid_path) in enumerate(valid_slots, start=1):
+        # Copy videos into dataset
+        for idx, vid_path in enumerate(valid_videos, start=1):
             ext_v = vid_path.suffix
-            shutil.copy2(vid_path, ds_dir / "videos" / f"{slot_idx}_short{ext_v}")
-            log(f"Queued Short [{slot_idx}]: '{vid_path.name}'")
+            shutil.copy2(vid_path, ds_dir / "videos" / f"{idx:02d}_{vid_path.name}")
+            log(f"Queued Short [{idx}]: '{vid_path.name}'")
 
         # 2. Copy Global Assets
         # Reference Voice
@@ -422,13 +529,21 @@ def run_sync_and_launch(config):
             shutil.copy2(bgm_matches[0], ds_dir / f"bgm{ext}")
             log(f"Applied Background Music: {bgm_matches[0].name}")
 
-        # Outro
-        outro_matches = [m for m in GLOBAL_UPLOADS.glob("outro.*") if not m.name.endswith(".meta.json")]
-        if outro_matches:
-            ext = outro_matches[0].suffix
-            shutil.copy2(outro_matches[0], ds_dir / "outros" / f"global_outro{ext}")
-            shutil.copy2(outro_matches[0], ds_dir / f"outro{ext}")
-            log(f"Applied Outro Clip: {outro_matches[0].name}")
+        # Outros (Multiple allowed)
+        valid_outros = [f for f in sorted(OUTROS_UPLOADS.glob("*"), key=lambda x: x.stat().st_mtime) if not f.name.endswith(".meta.json")]
+        if not valid_outros:
+            legacy_o = [m for m in GLOBAL_UPLOADS.glob("outro.*") if not m.name.endswith(".meta.json")]
+            if legacy_o:
+                valid_outros.extend(legacy_o)
+
+        if valid_outros:
+            for i, ov in enumerate(valid_outros):
+                ext_o = ov.suffix
+                shutil.copy2(ov, ds_dir / "outros" / f"outro_{i}{ext_o}")
+                if i == 0:
+                    shutil.copy2(ov, ds_dir / f"outro{ext_o}")
+            log(f"Applied {len(valid_outros)} Outro/Promo clip(s) into dataset.")
+
 
         # Write config.json
         cfg_path = ds_dir / "config.json"

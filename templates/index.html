@@ -23,7 +23,7 @@
     </header>
 
     <main class="container">
-        <!-- Section 1: Credentials & Browser Cache -->
+        <!-- Section 1: Credentials & Browser Storage -->
         <section class="card" id="credsCard">
             <div class="card-header creds-header">
                 <div>
@@ -86,21 +86,21 @@
             </div>
         </section>
 
-        <!-- Section 2: Global Shared Assets -->
+        <!-- Section 2: Shared Audio Media -->
         <section class="card">
             <div class="card-header">
-                <h2>2. Global Shared Media</h2>
-                <span class="subtitle">Upload once — reference voice, background music, and optional outro will apply across all shorts.</span>
+                <h2>2. Shared Audio Media</h2>
+                <span class="subtitle">Reference voice will clone both the shorts and the podcast outro via SeedVC.</span>
             </div>
             <div class="card-body">
                 <div class="globals-grid">
-                    <!-- Global Voice -->
+                    <!-- Voice -->
                     <div class="global-box" id="gb-voice">
                         <div class="gb-header">
                             <span class="gb-icon">🎙️</span>
                             <div class="gb-title">
                                 <h3>Reference Voice (SeedVC) <span class="required">*</span></h3>
-                                <p class="gb-desc">1 voice sample for all shorts (WAV/MP3)</p>
+                                <p class="gb-desc">1 voice sample for all shorts & outros (WAV/MP3)</p>
                             </div>
                         </div>
                         <div class="upload-dropzone" data-global="voice">
@@ -111,13 +111,13 @@
                         </div>
                     </div>
 
-                    <!-- Global BGM -->
+                    <!-- BGM -->
                     <div class="global-box" id="gb-bgm">
                         <div class="gb-header">
                             <span class="gb-icon">🎵</span>
                             <div class="gb-title">
                                 <h3>Background Music</h3>
-                                <p class="gb-desc">Auto-drop RMS detection (MP3/WAV)</p>
+                                <p class="gb-desc">Auto-drop RMS detection with ducking (MP3/WAV)</p>
                             </div>
                         </div>
                         <div class="upload-dropzone" data-global="bgm">
@@ -127,71 +127,103 @@
                             </div>
                         </div>
                     </div>
-
-                    <!-- Global Outro -->
-                    <div class="global-box" id="gb-outro">
-                        <div class="gb-header">
-                            <span class="gb-icon">🎬</span>
-                            <div class="gb-title">
-                                <h3>Outro / Promo Clip</h3>
-                                <p class="gb-desc">Auto-scaled & voice cloned</p>
-                            </div>
-                        </div>
-                        <div class="upload-dropzone" data-global="outro">
-                            <input type="file" accept=".mp4,.mov,.mkv,.webm" class="file-input">
-                            <div class="dz-content" id="outro-content">
-                                <span class="dz-prompt">Click or drag outro clip</span>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         </section>
 
-        <!-- Section 3: Batch Shorts Queue -->
+        <!-- Section 3: Multi-File Batch Shorts Dropzone (Drag As Many As You Want!) -->
         <section class="card">
-            <div class="card-header slots-header">
+            <div class="card-header flex-between">
                 <div>
-                    <h2>3. Batch Shorts Video Queue</h2>
-                    <span class="subtitle">Upload 1 to 10 short videos to be processed sequentially in the background.</span>
+                    <h2>3. Batch Shorts Video Queue (Multiple Files)</h2>
+                    <span class="subtitle">Drag & drop as many short videos as you want (5, 10, 15, 20+ videos) — no slot limits.</span>
                 </div>
-                <div class="slot-counter-wrap">
-                    <span class="counter-label">Number of Shorts:</span>
-                    <div class="counter-buttons" id="slotButtons">
-                        <button type="button" class="btn-slot-num active" data-count="1">1</button>
-                        <button type="button" class="btn-slot-num" data-count="2">2</button>
-                        <button type="button" class="btn-slot-num" data-count="3">3</button>
-                        <button type="button" class="btn-slot-num" data-count="4">4</button>
-                        <button type="button" class="btn-slot-num" data-count="5">5</button>
-                        <button type="button" class="btn-slot-num" data-count="6">6</button>
-                        <button type="button" class="btn-slot-num" data-count="7">7</button>
-                        <button type="button" class="btn-slot-num" data-count="8">8</button>
-                        <button type="button" class="btn-slot-num" data-count="9">9</button>
-                        <button type="button" class="btn-slot-num" data-count="10">10</button>
-                    </div>
+                <div class="queue-actions-header">
+                    <span class="badge-count" id="videoCountBadge">0 Videos Queued</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger hidden" id="clearAllVideosBtn">
+                        🗑️ Clear All
+                    </button>
                 </div>
             </div>
             <div class="card-body">
-                <div class="slots-container" id="slotsContainer">
-                    <!-- Dynamic Shorts Cards injected here by app.js -->
+                <!-- Large Multi-File Dropzone -->
+                <div class="bulk-dropzone" id="bulkVideosDropzone">
+                    <input type="file" id="bulkVideosInput" multiple accept=".mp4,.mov,.mkv,.webm" class="hidden-file-input">
+                    <div class="bulk-dz-inner">
+                        <div class="bulk-icon">📁</div>
+                        <div class="bulk-title">Drag & Drop ALL Short Videos Here</div>
+                        <p class="bulk-subtitle">Select or drop 10, 15, 20+ videos at once (MP4, MOV, MKV, WebM)</p>
+                        <button type="button" class="btn btn-primary btn-sm" id="browseVideosBtn">
+                            📂 Select Multiple Video Files
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Upload Progress Indicator -->
+                <div class="upload-progress-box hidden" id="videosUploadProgress">
+                    <span class="spinner-icon">⏳</span>
+                    <span id="videosUploadStatusText">Uploading videos...</span>
+                </div>
+
+                <!-- Queued Videos List -->
+                <div class="queued-videos-list" id="queuedVideosList">
+                    <!-- Populated dynamically by app.js -->
                 </div>
             </div>
         </section>
 
-        <!-- Section 4: Pipeline Settings -->
+        <!-- Section 4: Podcast Promo / Outro Clips (Multiple Allowed) -->
+        <section class="card">
+            <div class="card-header flex-between">
+                <div>
+                    <h2>4. 🎬 Podcast Promo / Outro Clips (Optional)</h2>
+                    <span class="subtitle">Upload 1 or more 8–10s promo clips. Attached to every 3rd short with voice cloning and 4K scaling.</span>
+                </div>
+                <div class="queue-actions-header">
+                    <span class="badge-count" id="outroCountBadge">0 Outros</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger hidden" id="clearAllOutrosBtn">
+                        🗑️ Clear Outros
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="bulk-dropzone bulk-dropzone-sm" id="bulkOutrosDropzone">
+                    <input type="file" id="bulkOutrosInput" multiple accept=".mp4,.mov,.mkv,.webm" class="hidden-file-input">
+                    <div class="bulk-dz-inner">
+                        <div class="bulk-icon">🎬</div>
+                        <div class="bulk-title">Drag & Drop Podcast Outro Clips</div>
+                        <p class="bulk-subtitle">Multiple clips allowed — randomly picked or rotated across every 3rd short</p>
+                        <button type="button" class="btn btn-secondary btn-sm" id="browseOutrosBtn">
+                            📂 Select Outro Video(s)
+                        </button>
+                    </div>
+                </div>
+
+                <div class="upload-progress-box hidden" id="outrosUploadProgress">
+                    <span class="spinner-icon">⏳</span>
+                    <span id="outrosUploadStatusText">Uploading outros...</span>
+                </div>
+
+                <div class="queued-videos-list queued-outros-list" id="queuedOutrosList">
+                    <!-- Populated dynamically by app.js -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Pipeline Settings -->
         <section class="card">
             <div class="card-header">
-                <h2>4. Pipeline & Enhancement Settings</h2>
-                <span class="subtitle">Fine-tune AI upscaling, watermark crop, outro frequency, and GPU cooldown.</span>
+                <h2>5. Pipeline & Enhancement Settings</h2>
+                <span class="subtitle">Real-ESRGAN AI 4K upscaler, watermark zoom crop, outro frequency, and GPU cooldown.</span>
             </div>
             <div class="card-body">
                 <div class="config-grid">
                     <div class="config-item">
-                        <label for="outroRatio">Outro Attachment Frequency</label>
+                        <label for="outroRatio">Podcast Outro Placement</label>
                         <select id="outroRatio" class="styled-select">
-                            <option value="every_3rd" selected>Every 3rd Short (Organic Mix)</option>
-                            <option value="all">Attach to ALL Shorts</option>
-                            <option value="none">None (Skip Outro)</option>
+                            <option value="every_3rd" selected>Every 3rd Short (Recommended)</option>
+                            <option value="all">Attach to Every Single Short</option>
+                            <option value="none">Skip Outro (No Outros)</option>
                         </select>
                     </div>
 
@@ -216,10 +248,10 @@
             </div>
         </section>
 
-        <!-- Section 5: Launch & Cloud Monitor -->
+        <!-- Section 6: Launch & Cloud Monitor -->
         <section class="card launcher-card">
             <div class="card-header">
-                <h2>5. Cloud GPU Execution</h2>
+                <h2>6. Cloud GPU Execution</h2>
                 <span class="subtitle">Automatic dataset sync, 0-second SeedVC model mounting, and headless background execution.</span>
             </div>
             <div class="card-body">
