@@ -666,7 +666,29 @@ def run_sync_and_launch(config):
         app_state["message"] = str(e)
         log(f"❌ Error during sync/run: {e}")
 
+@app.route("/api/verify_creds", methods=["POST"])
+def verify_creds():
+    return credentials()
+
+@app.route("/api/get_stored_accounts", methods=["GET"])
+def get_stored_accounts():
+    u, k = get_request_credentials()
+    if not u or not k:
+        u = DEFAULT_KAGGLE_USERNAME
+        k = DEFAULT_KAGGLE_KEY
+    return jsonify({
+        "active_username": u,
+        "accounts": {
+            DEFAULT_KAGGLE_USERNAME: {
+                "username": DEFAULT_KAGGLE_USERNAME,
+                "key": DEFAULT_KAGGLE_KEY,
+                "isDefault": True
+            }
+        }
+    })
+
 @app.route("/api/launch", methods=["POST"])
+@app.route("/api/launch_batch", methods=["POST"])
 def launch_pipeline():
     if app_state["status"] in ["syncing", "pushing", "running"]:
         return jsonify({"success": False, "error": f"Job already in progress (Status: {app_state['status']})"}), 400
@@ -683,7 +705,9 @@ def launch_pipeline():
         "kaggle_username": k_user,
         "kaggle_key": k_key,
         "cooldown_secs": int(config.get("cooldown_secs", 30)),
-        "outro_ratio": config.get("outro_ratio", "every_3rd")
+        "outro_ratio": config.get("outro_ratio", "every_3rd"),
+        "zoom_factor": float(config.get("zoom_factor", 1.08)),
+        "ai_upscaling": bool(config.get("ai_upscaling", True))
     }
 
     t = threading.Thread(target=run_sync_and_launch, args=(final_config,), daemon=True)
@@ -692,8 +716,10 @@ def launch_pipeline():
     return jsonify({"success": True, "message": "Batch shorts pipeline started!"})
 
 @app.route("/api/status", methods=["GET"])
+@app.route("/api/poll_status", methods=["GET"])
 def get_status():
     return jsonify(app_state)
+
 
 def monitor_kernel_background():
     """Background polling loop for active Kaggle kernel."""

@@ -848,13 +848,19 @@ document.addEventListener('DOMContentLoaded', () => {
             launchBtn.classList.add('btn-disabled');
 
             try {
-                const res = await apiFetch('/api/launch_batch', {
+                const res = await apiFetch('/api/launch', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(config)
                 });
-                const data = await res.json();
-                if (!data.success) throw new Error(data.error);
+                const text = await res.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (parseErr) {
+                    throw new Error(`Server error (${res.status}): ${text.substring(0, 120)}`);
+                }
+                if (!data.success) throw new Error(data.error || 'Pipeline launch failed');
 
                 startPolling();
             } catch (err) {
