@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaggle Batch Shorts Studio</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="navbar">
+        <div class="logo">
+            <span class="icon">🎬</span>
+            <div>
+                <h1>Kaggle Batch Shorts Studio</h1>
+                <span class="badge">GPU Cloud Edition</span>
+            </div>
+        </div>
+        <div class="connection-status" id="connectionStatus">
+            <span class="dot disconnected"></span>
+            <span id="connectionText">Checking Kaggle API...</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Section 1: Credentials & Browser Cache -->
+        <section class="card" id="credsCard">
+            <div class="card-header creds-header">
+                <div>
+                    <h2>1. Kaggle Account <span class="tag-browser-sync" id="browserSyncTag">🌐 Browser Sync</span></h2>
+                    <span class="subtitle">Each browser remembers its own active account automatically. No re-entering keys required.</span>
+                </div>
+                <div class="creds-header-actions">
+                    <button type="button" class="btn btn-secondary btn-sm" id="toggleCredsBtn">
+                        ➕ Add / Manage Accounts
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Connected Active Banner -->
+                <div class="account-badge-box" id="accountBadgeBox">
+                    <div class="account-info">
+                        <span class="badge-status-dot"></span>
+                        <div style="flex: 1;">
+                            <div class="account-name-line">
+                                <span class="account-label">Active Account:</span>
+                                <strong id="activeUsernameDisplay">@rathinnew</strong>
+                                <span class="tag-default" id="accountTagBadge">Default</span>
+                                <span class="tag-browser-cache" id="browserCacheBadge">Saved in this Browser</span>
+                            </div>
+                            <p class="account-subtext" id="accountSubtext">All batch processing and kernel launches in this browser will run under this account.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Switcher Bar -->
+                <div class="account-quick-switcher" id="quickSwitcherBox" style="margin-top: 14px;">
+                    <label for="quickAccountSelect" class="quick-switcher-label">
+                        <span>⚡ Switch Kaggle Account (in this browser):</span>
+                    </label>
+                    <div class="quick-switcher-row">
+                        <select id="quickAccountSelect" class="styled-select quick-select">
+                            <option value="rathinnew">@rathinnew (Default)</option>
+                        </select>
+                        <button type="button" class="btn btn-sm btn-outline-danger hidden" id="deleteAccountBtn" title="Remove selected account from this browser">
+                            🗑️ Remove
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Add/Switch Form -->
+                <form id="credsForm" class="creds-grid hidden" style="margin-top: 16px;">
+                    <div class="input-group">
+                        <label for="kaggleUsername">Kaggle Username</label>
+                        <input type="text" id="kaggleUsername" placeholder="e.g. your_kaggle_username" value="">
+                    </div>
+                    <div class="input-group">
+                        <label for="kaggleKey">Kaggle API Key (Token: KGAT_...)</label>
+                        <input type="password" id="kaggleKey" placeholder="Paste Kaggle API token">
+                    </div>
+                    <div class="btn-group" style="display: flex; gap: 8px;">
+                        <button type="submit" class="btn btn-primary" id="saveCredsBtn">💾 Save to this Browser</button>
+                        <button type="button" class="btn btn-secondary" id="resetDefaultCredsBtn" title="Reset to default">↩️ Reset Default</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Section 2: Global Shared Assets -->
+        <section class="card">
+            <div class="card-header">
+                <h2>2. Global Shared Media</h2>
+                <span class="subtitle">Upload once — reference voice, background music, and optional outro will apply across all shorts.</span>
+            </div>
+            <div class="card-body">
+                <div class="globals-grid">
+                    <!-- Global Voice -->
+                    <div class="global-box" id="gb-voice">
+                        <div class="gb-header">
+                            <span class="gb-icon">🎙️</span>
+                            <div class="gb-title">
+                                <h3>Reference Voice (SeedVC) <span class="required">*</span></h3>
+                                <p class="gb-desc">1 voice sample for all shorts (WAV/MP3)</p>
+                            </div>
+                        </div>
+                        <div class="upload-dropzone" data-global="voice">
+                            <input type="file" accept=".wav,.mp3,.m4a,.flac" class="file-input">
+                            <div class="dz-content" id="voice-content">
+                                <span class="dz-prompt">Click or drag reference voice</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Global BGM -->
+                    <div class="global-box" id="gb-bgm">
+                        <div class="gb-header">
+                            <span class="gb-icon">🎵</span>
+                            <div class="gb-title">
+                                <h3>Background Music</h3>
+                                <p class="gb-desc">Auto-drop RMS detection (MP3/WAV)</p>
+                            </div>
+                        </div>
+                        <div class="upload-dropzone" data-global="bgm">
+                            <input type="file" accept=".mp3,.wav,.m4a,.flac" class="file-input">
+                            <div class="dz-content" id="bgm-content">
+                                <span class="dz-prompt">Click or drag BGM audio</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Global Outro -->
+                    <div class="global-box" id="gb-outro">
+                        <div class="gb-header">
+                            <span class="gb-icon">🎬</span>
+                            <div class="gb-title">
+                                <h3>Outro / Promo Clip</h3>
+                                <p class="gb-desc">Auto-scaled & voice cloned</p>
+                            </div>
+                        </div>
+                        <div class="upload-dropzone" data-global="outro">
+                            <input type="file" accept=".mp4,.mov,.mkv,.webm" class="file-input">
+                            <div class="dz-content" id="outro-content">
+                                <span class="dz-prompt">Click or drag outro clip</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: Batch Shorts Queue -->
+        <section class="card">
+            <div class="card-header slots-header">
+                <div>
+                    <h2>3. Batch Shorts Video Queue</h2>
+                    <span class="subtitle">Upload 1 to 10 short videos to be processed sequentially in the background.</span>
+                </div>
+                <div class="slot-counter-wrap">
+                    <span class="counter-label">Number of Shorts:</span>
+                    <div class="counter-buttons" id="slotButtons">
+                        <button type="button" class="btn-slot-num active" data-count="1">1</button>
+                        <button type="button" class="btn-slot-num" data-count="2">2</button>
+                        <button type="button" class="btn-slot-num" data-count="3">3</button>
+                        <button type="button" class="btn-slot-num" data-count="4">4</button>
+                        <button type="button" class="btn-slot-num" data-count="5">5</button>
+                        <button type="button" class="btn-slot-num" data-count="6">6</button>
+                        <button type="button" class="btn-slot-num" data-count="7">7</button>
+                        <button type="button" class="btn-slot-num" data-count="8">8</button>
+                        <button type="button" class="btn-slot-num" data-count="9">9</button>
+                        <button type="button" class="btn-slot-num" data-count="10">10</button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="slots-container" id="slotsContainer">
+                    <!-- Dynamic Shorts Cards injected here by app.js -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 4: Pipeline Settings -->
+        <section class="card">
+            <div class="card-header">
+                <h2>4. Pipeline & Enhancement Settings</h2>
+                <span class="subtitle">Fine-tune AI upscaling, watermark crop, outro frequency, and GPU cooldown.</span>
+            </div>
+            <div class="card-body">
+                <div class="config-grid">
+                    <div class="config-item">
+                        <label for="outroRatio">Outro Attachment Frequency</label>
+                        <select id="outroRatio" class="styled-select">
+                            <option value="every_3rd" selected>Every 3rd Short (Organic Mix)</option>
+                            <option value="all">Attach to ALL Shorts</option>
+                            <option value="none">None (Skip Outro)</option>
+                        </select>
+                    </div>
+
+                    <div class="config-item">
+                        <label for="zoomFactor">Watermark Zoom Crop: <span id="zoomVal">1.08x</span></label>
+                        <input type="range" id="zoomFactor" min="1.0" max="1.25" step="0.01" value="1.08">
+                    </div>
+
+                    <div class="config-item">
+                        <label for="cooldownSecs">GPU Cooldown (seconds between videos)</label>
+                        <input type="number" id="cooldownSecs" min="10" max="120" value="30">
+                    </div>
+
+                    <div class="config-item">
+                        <label for="aiUpscaling">AI 4K Upscaler</label>
+                        <select id="aiUpscaling" class="styled-select">
+                            <option value="true" selected>✅ Enabled (Real-ESRGAN AnimeVideoV3)</option>
+                            <option value="false">❌ Disabled (Direct Copy)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Launch & Cloud Monitor -->
+        <section class="card launcher-card">
+            <div class="card-header">
+                <h2>5. Cloud GPU Execution</h2>
+                <span class="subtitle">Automatic dataset sync, 0-second SeedVC model mounting, and headless background execution.</span>
+            </div>
+            <div class="card-body">
+                <div class="launch-actions">
+                    <button type="button" class="btn btn-hero" id="launchBtn">
+                        <span class="btn-icon">🚀</span>
+                        <span class="btn-text">Sync & Start Batch Shorts on Kaggle GPU</span>
+                    </button>
+                    <a href="/api/download" class="btn btn-download hidden" id="downloadBtn">
+                        <span>📦</span>
+                        <span>Download all_final_videos.zip</span>
+                    </a>
+                </div>
+
+                <div class="status-tracker" id="tracker">
+                    <div class="status-row">
+                        <span class="status-badge" id="statusBadge">IDLE</span>
+                        <span class="status-msg" id="statusMessage">Ready to start.</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="progressBar" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div class="terminal-box">
+                    <div class="terminal-header">
+                        <span>Live Execution Log</span>
+                        <button class="btn-copy-log" id="clearLogBtn">Clear</button>
+                    </div>
+                    <pre class="terminal-body" id="terminalLogs">Awaiting start...</pre>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
