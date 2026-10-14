@@ -56,40 +56,37 @@ def log(msg):
     if len(app_state["logs"]) > 250:
         app_state["logs"].pop(0)
 
-DEFAULT_KAGGLE_USERNAME = "rathinnew"
-DEFAULT_KAGGLE_KEY = "KGAT_10cab40726cd143c3e7d52696187fb7a"
+DEFAULT_KAGGLE_USERNAME = os.environ.get("DEFAULT_KAGGLE_USERNAME", "")
+DEFAULT_KAGGLE_KEY = os.environ.get("DEFAULT_KAGGLE_KEY", "")
 
 def load_stored_credentials():
     kaggle_dir = Path.home() / ".kaggle"
     kaggle_json = kaggle_dir / "kaggle.json"
 
-    u = None
-    k = None
+    u = os.environ.get("KAGGLE_USERNAME", "").strip()
+    k = os.environ.get("KAGGLE_KEY", "").strip()
 
-    if kaggle_json.exists():
-        try:
-            with open(kaggle_json) as f:
-                data = json.load(f)
-            u = data.get("username", "").strip()
-            k = data.get("key", "").strip()
-        except Exception:
-            pass
+    if not u or not k:
+        if kaggle_json.exists():
+            try:
+                with open(kaggle_json) as f:
+                    data = json.load(f)
+                u = data.get("username", "").strip()
+                k = data.get("key", "").strip()
+            except Exception:
+                pass
 
     if not u or not k:
         u = DEFAULT_KAGGLE_USERNAME
         k = DEFAULT_KAGGLE_KEY
-        try:
-            kaggle_dir.mkdir(parents=True, exist_ok=True)
-            with open(kaggle_json, "w") as f:
-                json.dump({"username": u, "key": k}, f)
-            os.chmod(kaggle_json, 0o600)
-        except Exception:
-            pass
 
-    os.environ["KAGGLE_USERNAME"] = u
-    os.environ["KAGGLE_KEY"] = k
-    os.environ["KAGGLE_API_TOKEN"] = k
-    return {"configured": True, "username": u, "key": k, "is_default": (u == DEFAULT_KAGGLE_USERNAME)}
+    is_configured = bool(u and k)
+    if is_configured:
+        os.environ["KAGGLE_USERNAME"] = u
+        os.environ["KAGGLE_KEY"] = k
+        os.environ["KAGGLE_API_TOKEN"] = k
+    return {"configured": is_configured, "username": u, "key": k, "is_default": False}
+
 
 def get_request_credentials(req=None):
     if req is None:
@@ -147,24 +144,11 @@ def index():
 
 @app.route("/api/reset_credentials", methods=["POST"])
 def reset_credentials():
-    kaggle_dir = Path.home() / ".kaggle"
-    kaggle_dir.mkdir(parents=True, exist_ok=True)
-    kaggle_json = kaggle_dir / "kaggle.json"
-    try:
-        with open(kaggle_json, "w") as f:
-            json.dump({"username": DEFAULT_KAGGLE_USERNAME, "key": DEFAULT_KAGGLE_KEY}, f)
-        os.chmod(kaggle_json, 0o600)
-    except Exception:
-        pass
-    os.environ["KAGGLE_USERNAME"] = DEFAULT_KAGGLE_USERNAME
-    os.environ["KAGGLE_KEY"] = DEFAULT_KAGGLE_KEY
-    os.environ["KAGGLE_API_TOKEN"] = DEFAULT_KAGGLE_KEY
-    log(f"Reset Kaggle credentials to default: @{DEFAULT_KAGGLE_USERNAME}")
-
-    resp = make_response(jsonify({"success": True, "username": DEFAULT_KAGGLE_USERNAME, "key": DEFAULT_KAGGLE_KEY}))
-    resp.set_cookie("kaggle_username", DEFAULT_KAGGLE_USERNAME, max_age=31536000, samesite="Lax", path="/")
-    resp.set_cookie("kaggle_key", DEFAULT_KAGGLE_KEY, max_age=31536000, samesite="Lax", path="/")
+    resp = make_response(jsonify({"success": True, "message": "Credentials cleared."}))
+    resp.delete_cookie("kaggle_username", path="/")
+    resp.delete_cookie("kaggle_key", path="/")
     return resp
+
 
 @app.route("/api/credentials", methods=["GET", "POST"])
 def credentials():
@@ -728,19 +712,22 @@ def verify_creds():
 @app.route("/api/get_stored_accounts", methods=["GET"])
 def get_stored_accounts():
     u, k = get_request_credentials()
-    if not u or not k:
-        u = DEFAULT_KAGGLE_USERNAME
-        k = DEFAULT_KAGGLE_KEY
-    return jsonify({
-        "active_username": u,
-        "accounts": {
-            DEFAULT_KAGGLE_USERNAME: {
-                "username": DEFAULT_KAGGLE_USERNAME,
-                "key": DEFAULT_KAGGLE_KEY,
-                "isDefault": True
+    if u and k:
+        return jsonify({
+            "active_username": u,
+            "accounts": {
+                u: {
+                    "username": u,
+                    "key": k,
+                    "isDefault": False
+                }
             }
-        }
+        })
+    return jsonify({
+        "active_username": None,
+        "accounts": {}
     })
+
 
 @app.route("/api/launch", methods=["POST"])
 @app.route("/api/launch_batch", methods=["POST"])

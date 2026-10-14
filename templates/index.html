@@ -32,7 +32,7 @@
                 </div>
                 <div class="creds-header-actions">
                     <button type="button" class="btn btn-secondary btn-sm" id="toggleCredsBtn">
-                        ➕ Add / Manage Accounts
+                        ➕ Add / Manage Account
                     </button>
                 </div>
             </div>
@@ -44,23 +44,23 @@
                         <div style="flex: 1;">
                             <div class="account-name-line">
                                 <span class="account-label">Active Account:</span>
-                                <strong id="activeUsernameDisplay">@rathinnew</strong>
-                                <span class="tag-default" id="accountTagBadge">Default</span>
-                                <span class="tag-browser-cache" id="browserCacheBadge">Saved in this Browser</span>
+                                <strong id="activeUsernameDisplay">Not Connected</strong>
+                                <span class="tag-default hidden" id="accountTagBadge">Configured</span>
+                                <span class="tag-browser-cache" id="browserCacheBadge">Per-Browser Private</span>
                             </div>
-                            <p class="account-subtext" id="accountSubtext">All batch processing and kernel launches in this browser will run under this account.</p>
+                            <p class="account-subtext" id="accountSubtext">Enter your Kaggle credentials below. Your key is stored ONLY in this browser and never shown to anyone else.</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- Quick Switcher Bar -->
-                <div class="account-quick-switcher" id="quickSwitcherBox" style="margin-top: 14px;">
+                <div class="account-quick-switcher hidden" id="quickSwitcherBox" style="margin-top: 14px;">
                     <label for="quickAccountSelect" class="quick-switcher-label">
                         <span>⚡ Switch Kaggle Account (in this browser):</span>
                     </label>
                     <div class="quick-switcher-row">
                         <select id="quickAccountSelect" class="styled-select quick-select">
-                            <option value="rathinnew">@rathinnew (Default)</option>
+                            <option value="">No account saved</option>
                         </select>
                         <button type="button" class="btn btn-sm btn-outline-danger hidden" id="deleteAccountBtn" title="Remove selected account from this browser">
                             🗑️ Remove
@@ -69,18 +69,17 @@
                 </div>
 
                 <!-- Add/Switch Form -->
-                <form id="credsForm" class="creds-grid hidden" style="margin-top: 16px;">
+                <form id="credsForm" class="creds-grid" style="margin-top: 16px;">
                     <div class="input-group">
                         <label for="kaggleUsername">Kaggle Username</label>
                         <input type="text" id="kaggleUsername" placeholder="e.g. your_kaggle_username" value="">
                     </div>
                     <div class="input-group">
                         <label for="kaggleKey">Kaggle API Key (Token: KGAT_...)</label>
-                        <input type="password" id="kaggleKey" placeholder="Paste Kaggle API token">
+                        <input type="password" id="kaggleKey" placeholder="Paste your Kaggle API token">
                     </div>
                     <div class="btn-group" style="display: flex; gap: 8px;">
-                        <button type="submit" class="btn btn-primary" id="saveCredsBtn">💾 Save to this Browser</button>
-                        <button type="button" class="btn btn-secondary" id="resetDefaultCredsBtn" title="Reset to default">↩️ Reset Default</button>
+                        <button type="submit" class="btn btn-primary" id="saveCredsBtn">💾 Connect & Save in this Browser</button>
                     </div>
                 </form>
             </div>

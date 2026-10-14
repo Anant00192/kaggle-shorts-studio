@@ -145,25 +145,44 @@ document.addEventListener('DOMContentLoaded', () => {
         const accounts = getStoredAccounts();
         const active = getActiveAccount();
         const browserName = getBrowserName();
+        const quickSwitcherBox = document.getElementById('quickSwitcherBox');
 
         if (browserSyncTag) {
-            browserSyncTag.textContent = `🌐 ${browserName} Sync`;
+            browserSyncTag.textContent = `🌐 ${browserName} Private`;
         }
 
-        if (active) {
+        if (active && active.username) {
             if (activeUsernameDisplay) activeUsernameDisplay.textContent = `@${active.username}`;
             if (accountTagBadge) {
-                accountTagBadge.textContent = active.isDefault ? 'Default' : 'Custom';
-                accountTagBadge.className = active.isDefault ? 'tag-default' : 'tag-default custom';
+                accountTagBadge.textContent = 'Connected';
+                accountTagBadge.className = 'tag-default';
+                accountTagBadge.classList.remove('hidden');
             }
             if (browserCacheBadge) {
-                browserCacheBadge.textContent = `Saved in ${browserName}`;
+                browserCacheBadge.textContent = `Private to ${browserName}`;
             }
             if (accountSubtext) {
-                accountSubtext.textContent = `Batch processing and kernel launches in ${browserName} will execute under @${active.username}.`;
+                accountSubtext.textContent = `All batch processing in ${browserName} will execute under @${active.username}. Keys are stored locally and never shared.`;
             }
             if (kaggleUsernameInput) kaggleUsernameInput.value = active.username;
             if (kaggleKeyInput) kaggleKeyInput.value = active.key || '';
+
+            if (quickSwitcherBox) quickSwitcherBox.classList.remove('hidden');
+            if (credsForm) credsForm.classList.add('hidden');
+            if (toggleCredsBtn) toggleCredsBtn.textContent = '⚙️ Manage Account';
+        } else {
+            if (activeUsernameDisplay) activeUsernameDisplay.textContent = 'Not Connected';
+            if (accountTagBadge) accountTagBadge.classList.add('hidden');
+            if (browserCacheBadge) browserCacheBadge.textContent = 'No Account Saved';
+            if (accountSubtext) {
+                accountSubtext.textContent = 'Please enter your Kaggle credentials below. Saved securely ONLY in this browser.';
+            }
+            if (kaggleUsernameInput) kaggleUsernameInput.value = '';
+            if (kaggleKeyInput) kaggleKeyInput.value = '';
+
+            if (quickSwitcherBox) quickSwitcherBox.classList.add('hidden');
+            if (credsForm) credsForm.classList.remove('hidden');
+            if (toggleCredsBtn) toggleCredsBtn.textContent = '➕ Connect Kaggle Account';
         }
 
         // Render Quick Switcher dropdown
@@ -178,11 +197,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 quickAccountSelect.appendChild(opt);
             } else {
                 userList.forEach(u => {
-                    const acc = accounts[u];
                     const opt = document.createElement('option');
                     opt.value = u;
-                    const defLabel = acc.isDefault ? ' (Default)' : '';
-                    opt.textContent = `@${u}${defLabel}`;
+                    opt.textContent = `@${u}`;
                     if (active && active.username === u) {
                         opt.selected = true;
                     }
@@ -192,47 +209,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (deleteAccountBtn) {
-            const isNonDefault = active && !active.isDefault;
-            deleteAccountBtn.classList.toggle('hidden', !isNonDefault);
+            deleteAccountBtn.classList.toggle('hidden', !active);
         }
     }
 
     async function initKaggleAccounts() {
         try {
-            const res = await fetch('/api/get_stored_accounts');
-            const data = await res.json();
-            const serverAccounts = data.accounts || {};
-            const serverDefaultUser = data.active_username || 'rathinnew';
-
-            let localAccounts = getStoredAccounts();
-
-            Object.keys(serverAccounts).forEach(u => {
-                if (!localAccounts[u]) {
-                    localAccounts[u] = serverAccounts[u];
-                }
-            });
-
-            if (Object.keys(localAccounts).length === 0 && serverAccounts[serverDefaultUser]) {
-                localAccounts[serverDefaultUser] = serverAccounts[serverDefaultUser];
-            }
-
-            saveStoredAccounts(localAccounts);
-
+            // Read ONLY from this browser's private localStorage
+            const localAccounts = getStoredAccounts();
             let active = getActiveAccount();
+
             if (!active) {
-                if (localAccounts[serverDefaultUser]) {
-                    active = localAccounts[serverDefaultUser];
-                } else {
-                    const first = Object.keys(localAccounts)[0];
-                    if (first) active = localAccounts[first];
+                const keys = Object.keys(localAccounts);
+                if (keys.length > 0) {
+                    active = localAccounts[keys[0]];
+                    setActiveAccount(active);
                 }
-                if (active) setActiveAccount(active);
             }
 
             renderAccountUI();
 
-            if (active) {
+            if (active && active.username) {
                 await verifyKaggleCreds(active.username, active.key);
+            } else {
+                updateConnectionState(false, 'Kaggle Account Required');
             }
         } catch (err) {
             console.error('Account init failed:', err);
@@ -264,11 +264,11 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleCredsBtn.addEventListener('click', () => {
             const isHidden = credsForm.classList.contains('hidden');
             credsForm.classList.toggle('hidden', !isHidden);
-            toggleCredsBtn.textContent = isHidden ? '✖ Close Manager' : '➕ Add / Manage Accounts';
+            toggleCredsBtn.textContent = isHidden ? '✖ Close Form' : '⚙️ Manage Account';
         });
     }
 
-    // Save account
+    // Save account (local to this browser only)
     if (credsForm) {
         credsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -292,9 +292,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             saveCredsBtn.textContent = 'Validating...';
             await verifyKaggleCreds(username, key);
-            saveCredsBtn.textContent = '💾 Save to this Browser';
+            saveCredsBtn.textContent = '💾 Connect & Save in this Browser';
             credsForm.classList.add('hidden');
-            toggleCredsBtn.textContent = '➕ Add / Manage Accounts';
+            toggleCredsBtn.textContent = '⚙️ Manage Account';
         });
     }
 
@@ -312,44 +312,30 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Delete account
+    // Delete account from this browser
     if (deleteAccountBtn) {
         deleteAccountBtn.addEventListener('click', () => {
             const active = getActiveAccount();
-            if (!active || active.isDefault) return;
+            if (!active) return;
             if (confirm(`Remove @${active.username} from this browser?`)) {
                 const accounts = getStoredAccounts();
                 delete accounts[active.username];
                 saveStoredAccounts(accounts);
                 localStorage.removeItem(ACTIVE_KEY);
+                document.cookie = 'kaggle_username=; path=/; max-age=0; SameSite=Lax';
+                document.cookie = 'kaggle_key=; path=/; max-age=0; SameSite=Lax';
+
                 const remaining = Object.keys(accounts);
                 if (remaining.length > 0) {
                     setActiveAccount(accounts[remaining[0]]);
                 }
                 renderAccountUI();
                 const newActive = getActiveAccount();
-                if (newActive) verifyKaggleCreds(newActive.username, newActive.key);
-            }
-        });
-    }
-
-    // Reset default account
-    if (resetDefaultCredsBtn) {
-        resetDefaultCredsBtn.addEventListener('click', async () => {
-            try {
-                const res = await fetch('/api/get_stored_accounts');
-                const data = await res.json();
-                const defUser = data.active_username || 'rathinnew';
-                const accounts = getStoredAccounts();
-                if (data.accounts && data.accounts[defUser]) {
-                    accounts[defUser] = data.accounts[defUser];
-                    saveStoredAccounts(accounts);
-                    setActiveAccount(accounts[defUser]);
-                    renderAccountUI();
-                    await verifyKaggleCreds(defUser, accounts[defUser].key);
+                if (newActive) {
+                    verifyKaggleCreds(newActive.username, newActive.key);
+                } else {
+                    updateConnectionState(false, 'Kaggle Account Required');
                 }
-            } catch (e) {
-                console.error(e);
             }
         });
     }
