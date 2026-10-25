@@ -606,17 +606,24 @@ def run_sync_and_launch(config):
 
         api = get_kaggle_api(username, key)
         exists = False
+        current_ver = 0
         try:
             existing = api.dataset_list(user=username, search=dataset_slug)
             for d in (existing or []):
                 if getattr(d, 'ref', '') == f"{username}/{dataset_slug}":
                     exists = True
                     break
+            if exists:
+                try:
+                    st_info = json.loads(api.dataset_status(f"{username}/{dataset_slug}", format="json"))
+                    current_ver = int(st_info.get("current_version_number", 0))
+                except Exception:
+                    current_ver = 0
         except Exception as e:
             log(f"Dataset lookup notice: {e}")
 
         if exists:
-            log(f"Dataset '{dataset_slug}' exists. Creating new version...")
+            log(f"Dataset '{dataset_slug}' exists (Current Version {current_ver}). Creating new version...")
             res = api.dataset_create_version(str(ds_dir), version_notes=f"Batch Shorts run {time.strftime('%Y-%m-%d %H:%M')}", dir_mode="zip")
             log(f"Dataset version created: {res}")
         else:
@@ -624,17 +631,32 @@ def run_sync_and_launch(config):
             res = api.dataset_create_new(str(ds_dir), public=False, dir_mode="zip")
             log(f"Dataset created: {res}")
 
-        app_state["message"] = "Waiting for Kaggle to index dataset..."
-        log("Waiting for Kaggle dataset to become READY...")
-        for _ in range(25):
+        target_ver = current_ver + 1 if exists else 1
+        app_state["message"] = f"Waiting for Kaggle to index dataset (v{target_ver})..."
+        log(f"Waiting for Kaggle dataset to become READY (targeting Version {target_ver})...")
+
+        indexed = False
+        for attempt in range(60):
             try:
-                ds_status = str(api.dataset_status(f"{username}/{dataset_slug}")).lower()
-                if "ready" in ds_status:
-                    log("✅ Dataset is READY on Kaggle!")
+                st_json = api.dataset_status(f"{username}/{dataset_slug}", format="json")
+                st_data = json.loads(st_json) if isinstance(st_json, str) else {}
+                st_val = str(st_data.get("status", "")).lower()
+                v_num = int(st_data.get("current_version_number", 0))
+                if (attempt + 1) % 5 == 0 or v_num >= target_ver:
+                    log(f"Kaggle Dataset Indexing: Version {v_num} (target {target_ver}) | Status: {st_val} (check {attempt+1}/60)")
+                if st_val == "error":
+                    raise RuntimeError(f"Kaggle dataset indexing failed with status: {st_val}")
+                if v_num >= target_ver and "ready" in st_val:
+                    log(f"✅ Dataset Version {v_num} is READY and fully indexed on Kaggle!")
+                    indexed = True
                     break
-            except Exception:
-                pass
+            except Exception as e:
+                if (attempt + 1) % 5 == 0:
+                    log(f"Dataset status check: {e}")
             time.sleep(3)
+
+        if not indexed:
+            log("⚠️ Warning: Dataset indexing wait finished; proceeding with kernel push...")
 
         app_state["progress"] = 60
         app_state["status"] = "pushing"
