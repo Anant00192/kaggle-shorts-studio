@@ -192,6 +192,106 @@ def credentials():
         return jsonify({"success": False, "error": f"Authentication failed: {str(e)}"}), 400
 
 # ==========================================
+# Routes: Kaggle Cloud Dataset Management
+# ==========================================
+
+@app.route("/api/kaggle_dataset_status", methods=["GET"])
+def kaggle_dataset_status():
+    u, k = get_request_credentials()
+    if not u or not k:
+        stored = load_stored_credentials()
+        u = stored.get("username", DEFAULT_KAGGLE_USERNAME)
+        k = stored.get("key", DEFAULT_KAGGLE_KEY)
+
+    if not u or not k:
+        return jsonify({"configured": False, "exists": False, "message": "Kaggle credentials not configured"})
+
+    dataset_slug = "batch-shorts-dataset"
+    full_ref = f"{u}/{dataset_slug}"
+    try:
+        api = get_kaggle_api(u, k)
+        existing = api.dataset_list(user=u, search=dataset_slug)
+        found = False
+        for d in (existing or []):
+            if getattr(d, 'ref', '') == full_ref:
+                found = True
+                break
+
+        if not found:
+            return jsonify({
+                "configured": True,
+                "exists": False,
+                "dataset": full_ref,
+                "message": "No dataset found on Kaggle (Clean Cloud State)"
+            })
+
+        file_count = 0
+        try:
+            flist = api.dataset_list_files(full_ref, page_size=100)
+            files = flist.files if hasattr(flist, 'files') else []
+            file_count = len(files)
+        except Exception:
+            file_count = 0
+
+        return jsonify({
+            "configured": True,
+            "exists": True,
+            "dataset": full_ref,
+            "file_count": file_count,
+            "message": f"Dataset '{dataset_slug}' exists on Kaggle ({file_count} files)."
+        })
+    except Exception as e:
+        return jsonify({
+            "configured": True,
+            "exists": False,
+            "error": str(e),
+            "dataset": full_ref
+        })
+
+
+@app.route("/api/delete_kaggle_dataset", methods=["POST"])
+def delete_kaggle_dataset():
+    u, k = get_request_credentials()
+    if not u or not k:
+        stored = load_stored_credentials()
+        u = stored.get("username", DEFAULT_KAGGLE_USERNAME)
+        k = stored.get("key", DEFAULT_KAGGLE_KEY)
+
+    if not u or not k:
+        return jsonify({"success": False, "error": "Kaggle credentials not configured"}), 400
+
+    dataset_slug = "batch-shorts-dataset"
+    kernel_slug = "batch-shorts-generator"
+    full_ref = f"{u}/{dataset_slug}"
+
+    try:
+        api = get_kaggle_api(u, k)
+
+        # Cancel/delete any running kernel session if present
+        try:
+            api.kernels_delete(f"{u}/{kernel_slug}", no_confirm=True)
+            log(f"🛑 Cancelled and removed active kernel '{u}/{kernel_slug}'.")
+        except Exception:
+            pass
+
+        # Delete dataset
+        api.dataset_delete(u, dataset_slug, no_confirm=True)
+        log(f"🗑️ Purged Kaggle cloud dataset '{full_ref}'. Cloud is now clean for new batches!")
+
+        app_state["status"] = "idle"
+        app_state["progress"] = 0
+        app_state["message"] = "Cloud dataset purged successfully. Ready for a clean new batch!"
+
+        return jsonify({
+            "success": True,
+            "message": f"Successfully deleted '{full_ref}' and any active kernels from Kaggle!"
+        })
+    except Exception as e:
+        err_msg = str(e)
+        log(f"⚠️ Error while deleting dataset '{full_ref}': {err_msg}")
+        return jsonify({"success": False, "error": err_msg}), 500
+
+# ==========================================
 # Routes: Assets Management
 # ==========================================
 
@@ -622,12 +722,24 @@ def run_sync_and_launch(config):
         except Exception as e:
             log(f"Dataset lookup notice: {e}")
 
+        auto_purge = config.get("auto_purge", True)
+        if auto_purge and exists:
+            log(f"🗑️ Auto-Purge: Deleting previous cloud dataset '{username}/{dataset_slug}' to guarantee 0% stale/mixed videos...")
+            try:
+                api.dataset_delete(username, dataset_slug, no_confirm=True)
+                log("✅ Previous cloud dataset deleted successfully from Kaggle.")
+                exists = False
+                current_ver = 0
+                time.sleep(2)
+            except Exception as purge_err:
+                log(f"Notice during auto-purge: {purge_err}")
+
         if exists:
             log(f"Dataset '{dataset_slug}' exists (Current Version {current_ver}). Creating new version...")
             res = api.dataset_create_version(str(ds_dir), version_notes=f"Batch Shorts run {time.strftime('%Y-%m-%d %H:%M')}", dir_mode="zip")
             log(f"Dataset version created: {res}")
         else:
-            log(f"Creating new private dataset '{dataset_slug}'...")
+            log(f"Creating fresh private dataset '{dataset_slug}'...")
             res = api.dataset_create_new(str(ds_dir), public=False, dir_mode="zip")
             log(f"Dataset created: {res}")
 
