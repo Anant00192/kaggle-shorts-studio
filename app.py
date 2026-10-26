@@ -935,6 +935,7 @@ def launch_pipeline():
         "outro_ratio": config.get("outro_ratio", "every_3rd"),
         "zoom_factor": float(config.get("zoom_factor", 1.08)),
         "ai_upscaling": bool(config.get("ai_upscaling", True)),
+        "resolution": str(config.get("resolution", "2k")).lower(),
         "auto_purge": bool(config.get("auto_purge", True)) if not use_existing else False,
         "use_existing_dataset": use_existing,
         "dataset_slug": config.get("dataset_slug") or "batch-shorts-dataset"
